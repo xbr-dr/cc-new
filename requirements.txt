@@ -1,0 +1,9 @@
+Flask
+Flask-Cors
+Werkzeug
+PyPDF2
+nltk
+sentence-transformers
+faiss-cpu
+numpy
+groq
