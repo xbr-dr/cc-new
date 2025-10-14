@@ -9,7 +9,7 @@ import pandas as pd
 
 nltk.download('punkt_tab')
 
-embed_model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
+embed_model = SentenceTransformer("sentence-transformers/all-MiniLM-L12-v2")
 
 corpus = []
 index = None

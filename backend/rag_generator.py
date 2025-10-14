@@ -1,55 +1,79 @@
+"""
+Lightweight RAG Generator Module
+--------------------------------
+Uses Ollama with a small local model (e.g., phi3:mini)
+or can be easily switched to an API-based model like OpenAI, Groq, or Gemini.
+
+Functions:
+- generate_answer(history)
+"""
+
 import re
-import ollama
 from rag_retriever import retrieve_relevant_chunks
 
-GREETINGS = {"hi", "hello", "hey", "good morning", "good afternoon", "good evening"}
+# Optional: import ollama if installed
+try:
+    import ollama
+    _USE_OLLAMA = True
+except ImportError:
+    _USE_OLLAMA = False
+    import requests  # fallback for API option
+
+
+# === CONFIGURATION ===
+SMALL_MODEL = "qwen3:0.6b"  # small, fast Ollama model
+API_FALLBACK_URL = ""       # add endpoint if using external API (optional)
+
 
 def generate_answer(history):
+    """Generates a context-aware answer from chat history."""
     if not history or not isinstance(history, list):
         return "Invalid chat history."
 
-    last_message = history[-1]["content"].strip().lower()
+    # Get latest user message
+    user_message = history[-1]["content"] if history[-1]["role"] == "user" else ""
+    if not user_message.strip():
+        return "Please ask a valid question."
 
-    # Quick response for greetings (no RAG, no model call)
-    if last_message in GREETINGS:
-        return "Hello! How can I assist you with campus or college-related questions today?"
+    # Retrieve relevant chunks from knowledge base
+    relevant_docs = retrieve_relevant_chunks(user_message, top_k=5)
+    context_text = "\n\n".join(relevant_docs) if relevant_docs else "No context found."
 
-    # Retrieve RAG context for the latest user question
-    relevant_docs = retrieve_relevant_chunks(last_message, top_k=5)
-    context_text = "\n\n".join(relevant_docs).strip()
+    # Strict system behavior (campus-related focus)
+    system_instructions = """
+You are CampusGPT, a helpful assistant for a college campus.
+Answer ONLY questions related to the campus, its facilities, staff, departments, courses, events, contact details, and other official information.
+If the question is unrelated to campus topics, politely decline to answer.
+"""
 
-    # System prompts — refined
-    system_prompts = [
-        {
-            "role": "system",
-            "content": (
-                "You are CampusGPT, a polite, professional assistant that ONLY answers "
-                "questions related to our college, campus facilities, departments, staff, events, "
-                "courses, admission process, and official guidelines.\n\n"
-                "Check the provided context for every question. "
-                "If relevant information is found, use it to answer accurately and concisely.\n\n"
-                "If the current question is unrelated to the campus or has no matching information "
-                "in the context, respond exactly:\n"
-                "'I could not find that information in our campus resources. Please rephrase your question so it relates to the campus.'\n\n"
-                "Do not guess or make up details. Do not refuse future relevant questions because of past irrelevant ones.\n"
-                "Never include <think> tags, reasoning steps, or internal thoughts in your answer."
+    # Combine everything into a structured prompt
+    messages = [
+        {"role": "system", "content": system_instructions.strip()},
+        {"role": "system", "content": f"Relevant context from documents:\n{context_text}"},
+    ] + history
+
+    try:
+        # === Option 1: Local Ollama ===
+        if _USE_OLLAMA:
+            response = ollama.chat(
+                model=SMALL_MODEL,
+                messages=messages,
+                options={"temperature": 0.6, "num_predict": 250}
             )
-        },
-        {"role": "system", "content": f"Context:\n{context_text if context_text else '(No relevant campus info found)'}"}
-    ]
+            assistant_reply = response["message"]["content"]
 
-    # Combine with full conversation history
-    messages = system_prompts + history
+        # === Option 2: Remote API (if you add one) ===
+        elif API_FALLBACK_URL:
+            payload = {"messages": messages}
+            res = requests.post(API_FALLBACK_URL, json=payload, timeout=30)
+            assistant_reply = res.json().get("reply", "Error: No response from API.")
+        else:
+            return "Error: No model or API configured. Please install Ollama or set API_FALLBACK_URL."
 
-    # Call Ollama
-    response = ollama.chat(
-        model="qwen3:0.6b",  # ensure model is installed
-        messages=messages,
-        options={"temperature": 0.3}
-    )
+        # Clean output (remove <think> tags etc.)
+        assistant_reply = re.sub(r"<think>.*?</think>", "", assistant_reply, flags=re.DOTALL).strip()
 
-    # Clean unwanted <think> tags if they appear
-    answer = response["message"]["content"]
-    answer = re.sub(r"<think>.*?</think>", "", answer, flags=re.DOTALL).strip()
+    except Exception as e:
+        assistant_reply = f"Error generating answer: {e}"
 
-    return answer
+    return assistant_reply
