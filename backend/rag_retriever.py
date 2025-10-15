@@ -3,8 +3,13 @@ import re
 import numpy as np
 from fastembed import FastEmbed
 
+HF_TOKEN = os.getenv("HF_TOKEN")  # Render environment variable
+
 # Initialize lightweight embedding model
-embed_model = FastEmbed.load("all-MiniLM-L12-v2")
+if HF_TOKEN:
+    embed_model = FastEmbed.load("all-MiniLM-L12-v2", use_auth_token=HF_TOKEN)
+else:
+    embed_model = FastEmbed.load("all-MiniLM-L12-v2")
 corpus = []
 corpus_embeddings = None
 
