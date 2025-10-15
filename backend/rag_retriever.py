@@ -1,11 +1,10 @@
 import os
 import re
 import numpy as np
-from fastembed import TextEmbedding
+import FastEmbed
 
 # Initialize lightweight embedding model
-embed_model = TextEmbedding("sentence-transformers/all-MiniLM-L6-v2")
-
+embed_model = FastEmbed.load("all-MiniLM-L12-v2")
 corpus = []
 corpus_embeddings = None
 
