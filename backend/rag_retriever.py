@@ -7,7 +7,7 @@ HF_TOKEN = os.getenv("HF_TOKEN")  # Render environment variable
 
 # Initialize lightweight embedding model
 if HF_TOKEN:
-    embed_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5", use_auth_token=HF_TOKEN)
+    embed_model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2", use_auth_token=HF_TOKEN)
 else:
     embed_model = TextEmbedding(model_name="all-MiniLM-L12-v2")
 corpus = []
