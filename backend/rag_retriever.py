@@ -1,15 +1,15 @@
 import os
 import re
 import numpy as np
-from fastembed import FastEmbed
+from fastembed import TextEmbedding
 
 HF_TOKEN = os.getenv("HF_TOKEN")  # Render environment variable
 
 # Initialize lightweight embedding model
 if HF_TOKEN:
-    embed_model = FastEmbed.load("all-MiniLM-L12-v2", use_auth_token=HF_TOKEN)
+    embed_model = TextEmbedding(model_name="all-MiniLM-L12-v2", use_auth_token=HF_TOKEN)
 else:
-    embed_model = FastEmbed.load("all-MiniLM-L12-v2")
+    embed_model = TextEmbedding(model_name="all-MiniLM-L12-v2")
 corpus = []
 corpus_embeddings = None
 
