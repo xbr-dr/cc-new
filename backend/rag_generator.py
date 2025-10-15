@@ -15,7 +15,7 @@ except ImportError:
     raise ImportError("Please install huggingface_hub: pip install huggingface_hub")
 
 # === CONFIGURATION ===
-HF_TOKEN = os.getenv("HF_TOKEN", "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")
+HF_TOKEN = os.getenv("HF_TOKEN")
 MODEL_NAME = "meta-llama/Llama-3.2-1B-Instruct"
 
 # Initialize InferenceClient with Novita provider
