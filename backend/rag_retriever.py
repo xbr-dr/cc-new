@@ -1,7 +1,7 @@
 import os
 import re
 import numpy as np
-import FastEmbed
+import fastembed
 
 # Initialize lightweight embedding model
 embed_model = FastEmbed.load("all-MiniLM-L12-v2")
