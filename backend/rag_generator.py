@@ -1,76 +1,70 @@
 """
 Lightweight RAG Generator Module
 --------------------------------
-Uses Ollama with a small local model (e.g., phi3:mini)
-or can be easily switched to an API-based model like OpenAI, Groq, or Gemini.
-
-Functions:
-- generate_answer(history)
+Uses Hugging Face Inference API (Novita provider) with Llama-3.2-1B-Instruct.
+Fully serverless, no local model required.
 """
 
+import os
 import re
 from rag_retriever import retrieve_relevant_chunks
 
-# Optional: import ollama if installed
 try:
-    import ollama
-    _USE_OLLAMA = True
+    from huggingface_hub import InferenceClient
 except ImportError:
-    _USE_OLLAMA = False
-    import requests  # fallback for API option
-
+    raise ImportError("Please install huggingface_hub: pip install huggingface_hub")
 
 # === CONFIGURATION ===
-SMALL_MODEL = "qwen3:0.6b"  # small, fast Ollama model
-API_FALLBACK_URL = ""       # add endpoint if using external API (optional)
+HF_TOKEN = os.getenv("HF_TOKEN", "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")
+MODEL_NAME = "meta-llama/Llama-3.2-1B-Instruct"
+
+# Initialize InferenceClient with Novita provider
+client = InferenceClient(
+    provider="novita",
+    api_key=HF_TOKEN,
+)
 
 
 def generate_answer(history):
-    """Generates a context-aware answer from chat history."""
+    """Generates a context-aware answer from chat history using serverless Llama-3.2-1B-Instruct."""
     if not history or not isinstance(history, list):
         return "Invalid chat history."
 
-    # Get latest user message
+    # Latest user message
     user_message = history[-1]["content"] if history[-1]["role"] == "user" else ""
     if not user_message.strip():
         return "Please ask a valid question."
 
-    # Retrieve relevant chunks from knowledge base
+    # Retrieve relevant knowledge chunks
     relevant_docs = retrieve_relevant_chunks(user_message, top_k=5)
     context_text = "\n\n".join(relevant_docs) if relevant_docs else "No context found."
 
-    # Strict system behavior (campus-related focus)
+    # System instructions
     system_instructions = """
 You are CampusGPT, a helpful assistant for a college campus.
 Answer ONLY questions related to the campus, its facilities, staff, departments, courses, events, contact details, and other official information.
 If the question is unrelated to campus topics, politely decline to answer.
 """
 
-    # Combine everything into a structured prompt
+    # Build messages payload
     messages = [
         {"role": "system", "content": system_instructions.strip()},
         {"role": "system", "content": f"Relevant context from documents:\n{context_text}"},
-    ] + history
+        {"role": "user", "content": user_message}
+    ]
 
     try:
-        # === Option 1: Local Ollama ===
-        if _USE_OLLAMA:
-            response = ollama.chat(
-                model=SMALL_MODEL,
-                messages=messages,
-                options={"temperature": 0.6, "num_predict": 250}
-            )
-            assistant_reply = response["message"]["content"]
+        # Serverless Novita call
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=messages,
+            temperature=0.6,
+            max_tokens=250
+        )
 
-        # === Option 2: Remote API (if you add one) ===
-        elif API_FALLBACK_URL:
-            payload = {"messages": messages}
-            res = requests.post(API_FALLBACK_URL, json=payload, timeout=30)
-            assistant_reply = res.json().get("reply", "Error: No response from API.")
-        else:
-            return "Error: No model or API configured. Please install Ollama or set API_FALLBACK_URL."
+        assistant_reply = completion.choices[0].message["content"]
 
-        # Clean output (remove <think> tags etc.)
+        # Clean output
         assistant_reply = re.sub(r"<think>.*?</think>", "", assistant_reply, flags=re.DOTALL).strip()
 
     except Exception as e:
